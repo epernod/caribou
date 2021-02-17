@@ -1,7 +1,9 @@
 project(Plugin VERSION 20.12.00)
 
 set(HEADER_FILES
-    Algebra/EigenMatrixWrapper.h
+    Algebra/BaseVectorOperations.h
+    Algebra/EigenMatrix.h
+    Algebra/EigenVector.h
     Forcefield/FictitiousGridElasticForce.h
     Forcefield/FictitiousGridHyperelasticForce.h
     Forcefield/HexahedronElasticForce.h
@@ -11,10 +13,13 @@ set(HEADER_FILES
     Material/HyperelasticMaterial.h
     Material/NeoHookeanMaterial.h
     Material/SaintVenantKirchhoffMaterial.h
+    Ode/LegacyStaticODESolver.h
+    Ode/NewtonRaphsonSolver.h
     Ode/StaticODESolver.h
     Solver/ConjugateGradientSolver.h
     Solver/EigenSparseSolver.h
     Solver/LDLTSolver.h
+    Solver/LinearSolver.h
     Solver/LLTSolver.h
     Solver/LUSolver.h
     Topology/CircleIsoSurface.h
@@ -34,6 +39,7 @@ set(TEMPLATE_FILES
 )
 
 set(SOURCE_FILES
+    Algebra/BaseVectorOperations.cpp
     Forcefield/FictitiousGridElasticForce.cpp
     Forcefield/FictitiousGridHyperelasticForce.cpp
     Forcefield/HexahedronElasticForce.cpp
@@ -41,6 +47,8 @@ set(SOURCE_FILES
     Forcefield/TetrahedronElasticForce.cpp
     Forcefield/TractionForce.cpp
     Material/HyperelasticMaterial.cpp
+    Ode/LegacyStaticODESolver.cpp
+    Ode/NewtonRaphsonSolver.cpp
     Ode/StaticODESolver.cpp
     Solver/ConjugateGradientSolver.cpp
     Solver/LDLTSolver.cpp
@@ -71,8 +79,6 @@ add_library(SofaCaribou ALIAS ${PROJECT_NAME})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME SofaCaribou)
 
-target_include_directories(${PROJECT_NAME} INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>")
-target_include_directories(${PROJECT_NAME} PUBLIC "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME} PUBLIC SofaCore SofaBaseTopology SofaBaseLinearSolver SofaEigen2Solver)
 target_link_libraries(${PROJECT_NAME} PUBLIC Caribou::Algebra Caribou::Geometry Caribou::Topology Caribou::Mechanics)
 target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen)

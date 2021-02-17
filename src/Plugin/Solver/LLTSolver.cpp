@@ -77,9 +77,9 @@ std::string LLTSolver<EigenSolver>::BackendName() {
 }
 
 static int SparseLLTSolverClass = sofa::core::RegisterObject("Caribou Sparse LLT linear solver")
-    .add< LLTSolver<Eigen::SimplicialLLT<Eigen::SparseMatrix<FLOATING_POINT_TYPE, Eigen::ColMajor, int>, Eigen::Lower, Eigen::AMDOrdering<int>>> >(true)
+    .add< LLTSolver<Eigen::SimplicialLLT<const Eigen::SparseMatrix<FLOATING_POINT_TYPE, Eigen::ColMajor, int>, Eigen::Lower, Eigen::AMDOrdering<int>>> >(true)
 #ifdef CARIBOU_WITH_MKL
-    .add< LLTSolver<Eigen::PardisoLLT<Eigen::SparseMatrix<FLOATING_POINT_TYPE, Eigen::RowMajor, int>>> >()
+    .add< LLTSolver<Eigen::PardisoLLT<const Eigen::SparseMatrix<FLOATING_POINT_TYPE, Eigen::RowMajor, int>>> >()
 #endif
 ;
 
