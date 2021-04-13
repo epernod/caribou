@@ -69,14 +69,14 @@ void TractionForce::init()
         // Try to find a triangle container
         auto triangle_container = this->getContext()->template get<sofa::component::topology::TriangleSetTopologyContainer>();
         if (triangle_container) {
-            d_triangles.setParent(&triangle_container->getTriangleDataArray());
+            d_triangles.setParent(&triangle_container->d_triangle);
             msg_info() << "Using the triangles of the container '" << triangle_container->getPathName() << "'";
         }
 
         // Try to find a quad container
         auto quad_container = this->getContext()->template get<sofa::component::topology::QuadSetTopologyContainer>();
         if (quad_container) {
-            d_quads.setParent(&quad_container->getQuadDataArray());
+            d_quads.setParent(&quad_container->d_quad);
             msg_info() << "Using the quads of the container '" << quad_container->getPathName() << "'";
         }
     }
