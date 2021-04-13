@@ -4,7 +4,10 @@ set(HEADER_FILES
     Tensor.h
 )
 
-find_package(Eigen3 QUIET REQUIRED)
+#Eigen3
+if(NOT ${Eigen3_FOUND})
+    find_package(Eigen3 QUIET REQUIRED)
+endif()
 
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(Caribou::Algebra ALIAS ${PROJECT_NAME})
