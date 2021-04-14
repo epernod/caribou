@@ -38,7 +38,7 @@ if (CARIBOU_COMPILED_AS_SOFA_SUBPROJECT)
 endif()
 
 # Include CMake specific tools
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(CheckCXXCompilerFlag)
 include(CMakePackageConfigHelpers)
 include(CMakeDependentOption)
@@ -69,16 +69,15 @@ endif ()
 CMAKE_DEPENDENT_OPTION(CARIBOU_BUILD_TESTS "Compile the automatic tests for Caribou." ON "GTest_FOUND OR GMock_FOUND" OFF)
 if (CARIBOU_BUILD_TESTS)
     if (TARGET gtest)
-        get_target_property(GTEST_INCLUDE_DIRS gtest INTERFACE_INCLUDE_DIRECTORIES)
-        get_target_property(GTEST_BOTH_LIBRARIES gtest LOCATION)
+        message(STATUS "Caribou with unittests")
     else()
-        add_library(gtest SHARED IMPORTED src/Config/src/Caribou/version.h.in)
+        add_library(gtest SHARED IMPORTED)
         set_target_properties(gtest PROPERTIES
             INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INCLUDE_DIRS}"
             IMPORTED_LOCATION "${GTEST_BOTH_LIBRARIES}"
         )
+        message(STATUS "Caribou with unittests\n\tLibraries: ${GTEST_BOTH_LIBRARIES}\n\tInclude directories: ${GTEST_INCLUDE_DIRS}")
     endif ()
-    message(STATUS "Caribou with unittests\n\tLibraries: ${GTEST_BOTH_LIBRARIES}\n\tInclude directories: ${GTEST_INCLUDE_DIRS}")
 elseif(NOT GTest_FOUND AND NOT GMock_FOUND)
     message(STATUS "Caribou without unittests (missing GTest)")
 endif()
