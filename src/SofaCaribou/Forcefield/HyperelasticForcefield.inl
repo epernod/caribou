@@ -2,6 +2,7 @@
 
 #include <SofaCaribou/config.h>
 #include <SofaCaribou/Forcefield/HyperelasticForcefield.h>
+#include <SofaCaribou/Topology/CaribouTopology.h>
 
 DISABLE_ALL_WARNINGS_BEGIN
 #include <sofa/helper/AdvancedTimer.h>
@@ -41,42 +42,74 @@ HyperelasticForcefield<Element>::HyperelasticForcefield()
 template <typename Element>
 void HyperelasticForcefield<Element>::init()
 {
+    using sofa::core::topology::BaseMeshTopology;
     Inherit::init();
 
-    if (number_of_elements() == 0) {
-        if (d_topology_container.get()) {
-            msg_warning() << "No element found in the mesh topology '" << d_topology_container->getPathName() << "'.";
-        } else if (not d_topology_container.get()) {
-            // No topology specified. Try to find one suitable.
-            auto containers = this->getContext()->template getObjects<sofa::core::topology::BaseMeshTopology>(
-                BaseContext::Local);
-            if (containers.empty()) {
-                msg_warning() << "Could not find a topology container in the current context.";
-            } else {
-                std::vector<sofa::core::topology::BaseMeshTopology *> suitable_containers;
-                for (const auto &container : containers) {
-                    d_topology_container.set(container);
-                    if (number_of_elements() > 0) {
-                        suitable_containers.push_back(container);
-                    }
-                    d_topology_container.set(nullptr);
-                }
+    auto * context = this->getContext();
 
-                if (suitable_containers.empty()) {
-                    msg_warning() << "Could not find a suitable topology container in the current context.";
-                } else if (suitable_containers.size() > 1) {
-                    msg_warning() <<
-                                  "Multiple topology were found in the context node." <<
-                                  " Please specify which one contains the elements on which this force field will be applied "
-                                  <<
-                                  "by explicitly setting the container's path in the  '"
-                                  << d_topology_container.getName() << "'  parameter.";
+    if (!this->mstate) {
+        msg_warning() << "No mechanical object found in the current context node. The data parameter "
+                      << "'" << this->mstate.getName() << "' can be use to set the path to a mechanical "
+                      << "object having a template of '" << DataTypes::Name() << "'";
+        return;
+    }
+
+    // If not topology is specified, try to find one automatically in the current context
+    if (not d_topology_container.get()) {
+        // No topology specified. Try to find one suitable.
+        auto caribou_containers = context->template getObjects<SofaCaribou::topology::CaribouTopology<Element>>(BaseContext::Local);
+        auto sofa_containers = context->template getObjects<BaseMeshTopology>(BaseContext::Local);
+        std::vector<BaseMeshTopology*> sofa_compatible_containers;
+        for (auto container : sofa_containers) {
+            if (mesh_is_compatible(container)) {
+                sofa_compatible_containers.push_back(container);
+            }
+        }
+        if (caribou_containers.empty() and sofa_compatible_containers.empty()) {
+            msg_warning() << "Could not find a topology container in the current context. "
+                          << "Please add a compatible one in the current context or set the "
+                          << "container's path using the '" << d_topology_container.getName()
+                          << "' data parameter.";
+        } else  {
+            if (caribou_containers.size() + sofa_compatible_containers.size() > 1) {
+                msg_warning() << "Multiple topologies were found in the context node. "
+                              << "Please specify which one contains the elements on "
+                              << "which this force field will be applied "
+                              << "by explicitly setting the container's path in the  '"
+                              << d_topology_container.getName() << "' data parameter.";
+            } else {
+                // Prefer caribou's containers first
+                if (not caribou_containers.empty()) {
+                    d_topology_container.set(caribou_containers[0]);
                 } else {
-                    d_topology_container.set(suitable_containers[0]);
-                    msg_info() << "Automatically found the topology '" << d_topology_container.get()->getPathName()
-                               << "'.";
+                    d_topology_container.set(sofa_compatible_containers[0]);
                 }
             }
+
+            msg_info() << "Automatically found the topology '" << d_topology_container.get()->getPathName()
+                       << "'.";
+        }
+    }
+
+    // Create a caribou internal Domain over the topology
+    if (d_topology_container.get()) {
+        auto sofa_topology = dynamic_cast<BaseMeshTopology*>(d_topology_container.get());
+        auto caribou_topology = dynamic_cast<SofaCaribou::topology::CaribouTopology<Element>*>(d_topology_container.get());
+        if (sofa_topology) {
+            // Initialize the caribou internal Mesh (needed to create Domain from SOFA's topologies)
+            // Translate the Sofa's mechanical state vector to Eigen vector type
+            sofa::helper::ReadAccessor<Data<VecCoord>> sofa_x0 = this->mstate->readRestPositions();
+            const Eigen::Map<const Eigen::Matrix<Real, Eigen::Dynamic, Dimension, Eigen::RowMajor>>    X0      (sofa_x0.ref().data()->data(), sofa_x0.size(), Dimension);
+            p_mesh.reset(new caribou::topology::Mesh<Dimension> (X0));
+
+            create_domain_from(sofa_topology);
+        } else {
+            p_mesh.reset();
+            p_domain = caribou_topology->domain();
+        }
+
+        if (number_of_elements() == 0) {
+            msg_warning() << "No element found in the topology '" << d_topology_container.get()->getPathName() << "'";
         }
     }
 
@@ -144,8 +177,8 @@ void HyperelasticForcefield<Element>::addForce(
 
     for (std::size_t element_id = 0; element_id < nb_elements; ++element_id) {
 
-        // Fetch the node indices of the element
-        const sofa::Index * node_indices = get_element_nodes_indices(element_id);
+        // Fetch the node indices of the element^
+        auto node_indices = p_domain->element_indices(element_id);
 
         // Fetch the initial and current positions of the element's nodes
         Matrix<NumberOfNodes, Dimension> current_nodes_position;
@@ -314,7 +347,7 @@ SReal HyperelasticForcefield<Element>::getPotentialEnergy (
 
     for (std::size_t element_id = 0; element_id < nb_elements; ++element_id) {
         // Fetch the node indices of the element
-        const sofa::Index * node_indices = get_element_nodes_indices(element_id);
+        auto node_indices = p_domain->element_indices(element_id);
 
         // Fetch the initial and current positions of the element's nodes
         Matrix<NumberOfNodes, Dimension> initial_nodes_position;
@@ -409,17 +442,8 @@ void HyperelasticForcefield<Element>::initialize_elements()
     // Loop on each element and compute the shape functions and their derivatives for every of their integration points
     for (std::size_t element_id = 0; element_id < nb_elements; ++element_id) {
 
-        // Fetch the node indices of the element
-        const sofa::Index * node_indices = get_element_nodes_indices(element_id);
-        Matrix<NumberOfNodes, Dimension> initial_nodes_position;
-
-        // Fetch the initial positions of the element's nodes
-        for (std::size_t i = 0; i < NumberOfNodes; ++i) {
-            initial_nodes_position.row(i) = X0.row(node_indices[i]);
-        }
-
-        // Create an Element instance from the node positions
-        const Element initial_element = Element(initial_nodes_position);
+        // Get an Element instance from the Domain
+        const auto initial_element = p_domain->element(element_id);
 
         // Fill in the Gauss integration nodes for this element
         p_elements_quadrature_nodes[element_id] = get_gauss_nodes(element_id, initial_element);
@@ -428,7 +452,7 @@ void HyperelasticForcefield<Element>::initialize_elements()
     // Compute the volume
     Real v = 0.;
     for (std::size_t element_id = 0; element_id < nb_elements; ++element_id) {
-        for (GaussNode &gauss_node : p_elements_quadrature_nodes[element_id]) {
+        for (const auto & gauss_node : gauss_nodes_of(element_id)) {
             // Jacobian of the gauss node's transformation mapping from the elementary space to the world space
             const auto detJ = gauss_node.jacobian_determinant;
 
@@ -447,6 +471,8 @@ template <typename Element>
 void HyperelasticForcefield<Element>::update_stiffness()
 {
     const auto material = d_material.get();
+
+    [[maybe_unused]]
     const auto enable_multithreading = d_enable_multithreading.getValue();
     if (!material) {
         return;
@@ -471,12 +497,12 @@ void HyperelasticForcefield<Element>::update_stiffness()
     #pragma omp parallel for if (enable_multithreading)
     for (int element_id = 0; element_id < static_cast<int>(nb_elements); ++element_id) {
         // Fetch the node indices of the element
-        const sofa::Index * node_indices = get_element_nodes_indices(element_id);
+        auto node_indices = p_domain->element_indices(element_id);
 
         using Stiffness = Eigen::Matrix<FLOATING_POINT_TYPE, NumberOfNodes*Dimension, NumberOfNodes*Dimension, Eigen::RowMajor>;
         Stiffness Ke = Stiffness::Zero();
 
-        for (GaussNode &gauss_node : p_elements_quadrature_nodes[element_id]) {
+        for (const auto & gauss_node : gauss_nodes_of(element_id)) {
             // Jacobian of the gauss node's transformation mapping from the elementary space to the world space
             const auto detJ = gauss_node.jacobian_determinant;
 
@@ -577,7 +603,8 @@ auto HyperelasticForcefield<Element>::get_gauss_nodes(const std::size_t & /*elem
         gauss_nodes.resize(element.number_of_gauss_nodes());
     }
 
-    for (std::size_t gauss_node_id = 0; gauss_node_id < element.number_of_gauss_nodes(); ++gauss_node_id) {
+    const auto nb_of_gauss_nodes = gauss_nodes.size();
+    for (std::size_t gauss_node_id = 0; gauss_node_id < nb_of_gauss_nodes; ++gauss_node_id) {
         const auto & g = element.gauss_node(gauss_node_id);
 
         const auto J = element.jacobian(g.position);
@@ -685,7 +712,7 @@ void HyperelasticForcefield<Element>::draw(const sofa::core::visual::VisualParam
 
     for (std::size_t element_id = 0; element_id < nb_elements; ++element_id) {
         // Fetch the node indices of the element
-        const sofa::Index * node_indices = get_element_nodes_indices(element_id);
+        auto node_indices = p_domain->element_indices(element_id);
         Matrix<NumberOfNodes, Dimension> element_nodes_position;
 
         // Fetch the initial positions of the element's nodes
@@ -765,19 +792,22 @@ auto HyperelasticForcefield<Element>::canCreate(HyperelasticForcefield<Element>*
     if (not topology_path.empty()) {
         topology_path = topology_path.substr(1); // removes the "@"
         // Make sure the specified topology has elements of type Element
-        auto topology = context->get<sofa::core::topology::BaseMeshTopology>(topology_path);
-        if (not topology or not mesh_is_compatible(topology)) {
+        auto topology = context->get<sofa::core::objectmodel::BaseObject>(topology_path);
+        auto caribou_topology = dynamic_cast<SofaCaribou::topology::CaribouTopology<Element> *>(topology);
+        auto sofa_topology = dynamic_cast<sofa::core::topology::BaseMeshTopology *>(topology);
+        if (not caribou_topology and (not sofa_topology or not mesh_is_compatible(sofa_topology))) {
             arg->logError("Cannot deduce the element type from the specified mesh topology '" + topology_path + "'. Add template=\""+this_element_type+"\" to use it.");
             return false;
         }
     } else {
         // Try to find a compatible topology in the current context
-        sofa::core::topology::BaseMeshTopology * topology = nullptr;
-        const auto topologies = context->getObjects<sofa::core::topology::BaseMeshTopology>(
-            BaseContext::SearchDirection::Local);
-        for (const auto t : topologies) {
-            if (mesh_is_compatible(t)) {
-                topology = t;
+        sofa::core::objectmodel::BaseObject * topology = nullptr;
+        auto objects = context->getObjects<sofa::core::objectmodel::BaseObject>(BaseContext::SearchDirection::Local);
+        for (auto * object : objects) {
+            auto caribou_topology = dynamic_cast<const SofaCaribou::topology::CaribouTopology<Element> *>(object);
+            auto sofa_topology = dynamic_cast<const sofa::core::topology::BaseMeshTopology *>(object);
+            if (caribou_topology  or (sofa_topology and mesh_is_compatible(sofa_topology))) {
+                topology = object;
                 break;
             }
         }

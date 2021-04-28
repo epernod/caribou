@@ -4,6 +4,7 @@
 
 #include <string>
 #include <memory>
+#include <Eigen/Eigen>
 
 namespace caribou::topology {
 
@@ -28,5 +29,32 @@ namespace caribou::topology {
          * Get the number of domains of the mesh.
          */
         [[nodiscard]] virtual inline auto number_of_domains() const -> UNSIGNED_INTEGER_TYPE = 0;
+
+        /*!
+         * Fetch the coordinates (x, y and z) of the given node.
+         *
+         * \note This method will always return a 3D vector, even if the Mesh instance is in 1D or 2D. In these
+         *       cases, the z (and y in 1D) components of the position vector will be 0.
+         * \note This method is very inefficient. For time sensitive applications, consider using directly the
+         *       Mesh::node() method of the derived Mesh class.
+         */
+        [[nodiscard]] virtual inline auto node(const UNSIGNED_INTEGER_TYPE & node_id) const -> Eigen::Vector3d  = 0;
+
+        /*!
+         * Adds (attaches) an already existing domain to this mesh.
+         *
+         * @param domain An orphan domain (without any attached mesh).
+         * @return The domain that is now linked to this mesh.
+         */
+        virtual inline auto add_domain(BaseDomain * domain) -> BaseDomain * = 0;
+
+        /*!
+         * Adds (attaches) an already existing domain to this mesh.
+         *
+         * @param domain An orphan domain (without any attached mesh).
+         * @param name   The name of the domain.
+         * @return The domain that is now linked to this mesh.
+         */
+        virtual inline auto add_domain(BaseDomain * domain, const std::string & name) -> BaseDomain * = 0;
     };
 }

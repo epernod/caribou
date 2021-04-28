@@ -15,15 +15,13 @@ DISABLE_ALL_WARNINGS_BEGIN
 #include <Caribou/config.h>
 #include <Caribou/constants.h>
 #include <Caribou/Geometry/Element.h>
-#include <Caribou/Geometry/Triangle.h>
-#include <Caribou/Geometry/Quad.h>
-#include <Caribou/Geometry/Tetrahedron.h>
-#include <Caribou/Geometry/Hexahedron.h>
+#include <Caribou/Topology/Mesh.h>
 
 
 
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
+#include <SofaCaribou/Topology/CaribouTopology.h>
 
 #if (defined(SOFA_VERSION) && SOFA_VERSION < 201299)
 namespace sofa { using Index = unsigned int; }
@@ -154,6 +152,10 @@ public:
     /** Get the number of elements contained in this field **/
     [[nodiscard]] inline
     virtual auto number_of_elements() const -> std::size_t {
+        if (p_domain) {
+            return p_domain->number_of_elements();
+        }
+
         return 0;
     }
 
@@ -224,11 +226,8 @@ protected:
 private:
 
     // These private methods are implemented but can be overridden
-
-    /** Get the element nodes indices relative to the state vector */
-    virtual auto get_element_nodes_indices(const std::size_t &) const -> const sofa::Index * {
-        return nullptr;
-    }
+    /** Create a Domain instance from the given SOFA topology and attach it to p_mesh */
+    virtual void create_domain_from(sofa::core::topology::BaseMeshTopology * topology) ;
 
     /** Compute and store the shape functions and their derivatives for every integration points */
     virtual void initialize_elements();
@@ -240,7 +239,9 @@ private:
     virtual auto get_gauss_nodes(const std::size_t & element_id, const Element & element) const -> GaussContainer;
 
     // Data members
-    Link<sofa::core::topology::BaseMeshTopology> d_topology_container;
+    /// This link is specifically set to point towards a very general BaseObject since it can be either a
+    /// BaseMeshTopology (SOFA topology container), or a CaribouTopology.
+    Link<sofa::core::objectmodel::BaseObject> d_topology_container;
     Link<material::HyperelasticMaterial<DataTypes>> d_material;
     Data<bool> d_enable_multithreading;
     Data<double> d_drawScale;
@@ -251,20 +252,15 @@ private:
     Eigen::Matrix<Real, Eigen::Dynamic, 1> p_eigenvalues;
     bool K_is_up_to_date = false;
     bool eigenvalues_are_up_to_date = false;
+
+    /// Pointer to the Domain used for this force field.
+    const caribou::topology::Domain<Element, sofa::core::topology::Topology::PointID> * p_domain {nullptr};
+
+    /// Pointer to a Mesh that created the domain. This pointer will be null if
+    /// a caribou's Mesh instance was found in the scene graph. Else, if a traditional
+    /// SOFA topology is used, the Mesh instance and the related Domain will be
+    /// created by this force field to allow compatibility with SOFA topologies.
+    std::unique_ptr< caribou::topology::Mesh<Dimension> > p_mesh;
 };
-
-// Tetrahedron specialization
-template <> auto HyperelasticForcefield<caribou::geometry::Tetrahedron < caribou::Linear>>::number_of_elements() const -> std::size_t;
-template <> auto HyperelasticForcefield<caribou::geometry::Tetrahedron < caribou::Linear>>::mesh_is_compatible(const sofa::core::topology::BaseMeshTopology * topology) -> bool;
-template <> auto HyperelasticForcefield<caribou::geometry::Tetrahedron < caribou::Linear>>::get_element_nodes_indices(const std::size_t & element_id) const -> const sofa::Index *;
-template <> auto HyperelasticForcefield<caribou::geometry::Tetrahedron < caribou::Linear>>::templateName(const HyperelasticForcefield<caribou::geometry::Tetrahedron < caribou::Linear>> *) -> std::string;
-extern template class HyperelasticForcefield<caribou::geometry::Tetrahedron < caribou::Linear>>;
-
-// Hexahedron specialization
-template <> auto HyperelasticForcefield<caribou::geometry::Hexahedron < caribou::Linear>>::number_of_elements() const -> std::size_t;
-template <> auto HyperelasticForcefield<caribou::geometry::Hexahedron < caribou::Linear>>::mesh_is_compatible(const sofa::core::topology::BaseMeshTopology * topology) -> bool;
-template <> auto HyperelasticForcefield<caribou::geometry::Hexahedron < caribou::Linear>>::get_element_nodes_indices(const std::size_t & element_id) const -> const sofa::Index *;
-template <> auto HyperelasticForcefield<caribou::geometry::Hexahedron < caribou::Linear>>::templateName(const HyperelasticForcefield<caribou::geometry::Hexahedron < caribou::Linear>> *) -> std::string;
-extern template class HyperelasticForcefield<caribou::geometry::Hexahedron < caribou::Linear>>;
 
 } // namespace SofaCaribou::forcefield

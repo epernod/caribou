@@ -9,6 +9,8 @@ set(HEADER_FILES
     Forcefield/FictitiousGridHyperelasticForce.h
     Forcefield/HexahedronElasticForce.h
     Forcefield/HyperelasticForcefield.h
+    Forcefield/HyperelasticForcefield[Hexahedron].cpp
+    Forcefield/HyperelasticForcefield[Tetrahedron].cpp
     Forcefield/TetrahedronElasticForce.h
     Forcefield/TractionForce.h
     Material/HyperelasticMaterial.h
@@ -24,6 +26,12 @@ set(HEADER_FILES
     Solver/LinearSolver.h
     Solver/LLTSolver.h
     Solver/LUSolver.h
+    Topology/CaribouMesh.h
+    Topology/CaribouTopology.h
+    Topology/CaribouTopology[Hexahedron].h
+    Topology/CaribouTopology[Quad].h
+    Topology/CaribouTopology[Tetrahedron].h
+    Topology/CaribouTopology[Triangle].h
     Topology/CircleIsoSurface.h
     Topology/CylinderIsoSurface.h
     Topology/FictitiousGrid.h
@@ -37,6 +45,8 @@ set(HEADER_FILES
 set(TEMPLATE_FILES
     Forcefield/HyperelasticForcefield.inl
     Solver/EigenSolver.inl
+    Topology/CaribouMesh.inl
+    Topology/CaribouTopology.inl
     Topology/FictitiousGrid.inl
     Solver/LDLTSolver.inl
     Solver/LLTSolver.inl
@@ -46,9 +56,10 @@ set(TEMPLATE_FILES
 set(SOURCE_FILES
     Algebra/BaseVectorOperations.cpp
     Forcefield/FictitiousGridElasticForce.cpp
-    Forcefield/FictitiousGridHyperelasticForce.cpp
+#    Forcefield/FictitiousGridHyperelasticForce.cpp
     Forcefield/HexahedronElasticForce.cpp
-    Forcefield/HyperelasticForcefield.cpp
+    Forcefield/HyperelasticForcefield[Hexahedron].cpp
+    Forcefield/HyperelasticForcefield[Tetrahedron].cpp
     Forcefield/TetrahedronElasticForce.cpp
     Forcefield/TractionForce.cpp
     Material/HyperelasticMaterial.cpp
@@ -60,6 +71,11 @@ set(SOURCE_FILES
     Solver/LDLTSolver.cpp
     Solver/LLTSolver.cpp
     Solver/LUSolver.cpp
+    Topology/CaribouMesh.cpp
+    Topology/CaribouTopology[Hexahedron].cpp
+    Topology/CaribouTopology[Quad].cpp
+    Topology/CaribouTopology[Tetrahedron].cpp
+    Topology/CaribouTopology[Triangle].cpp
     Topology/FictitiousGrid.cpp
     Topology/IsoSurface.cpp
     Visitor/AssembleGlobalMatrix.cpp
