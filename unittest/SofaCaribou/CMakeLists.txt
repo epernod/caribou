@@ -9,9 +9,14 @@ set(SOURCE_FILES
         Forcefield/test_tractionforce.cpp
         ODE/test_backward_euler.cpp
         ODE/test_static.cpp
-        Topology/test_cariboutopology.cpp
+
         Topology/test_fictitiousgrid.cpp
 )
+
+
+if (CARIBOU_WITH_VTK)
+    list(APPEND SOURCE_FILES Topology/test_cariboutopology.cpp)
+endif()
 
 enable_testing()
 
